@@ -1,0 +1,168 @@
+#!/bin/bash
+
+####
+## a2box - utility for creating virtual host for website
+##
+## creates a virtual host for apache2 website using steps described in
+## DigitalOcean's "how to set up apache virtual host on debian 8" guide
+##
+##    link: https://www.digitalocean.com/community/tutorials/how-to-set-up-apache-virtual-hosts-on-debian-8
+##  author: Petru Szemereczki
+## version: 0.X-dev
+##
+## TODO: I need to use my private project, which was already scripted
+####
+
+## FIXME
+# ROOT_DIR=$(dirname $0)
+ROOT_DIR="/mnt/d/self/a2box"
+
+## Including common functions
+source "${ROOT_DIR}/lib/functions.sh"
+
+## Checks for root user. If not, tries to gain su permissions.
+function check_root
+{
+  if [[ $(id -u) -ne 0 ]]; then
+    echo "You need to run script as root"
+    exit 1
+  fi
+}
+
+## TODO break this monolyth shit in multiple function blocks
+function create_vhost
+{
+  # Here we're building variables for template
+  local username=$1
+  local hostname=$2
+  local force=$3
+
+  echo
+  echo "--------"
+  echo "Username: ${username}"
+  echo "Hostname: ${hostname}"
+  echo "--------"
+  echo
+
+  if [[ -e "/var/www/${hostname}" ]] && [[ -d "/var/www/${hostname}" ]]; then
+    if [[ ! -z "${force}" ]]; then
+      echo "[info] removing existent vhost configuration"
+      rm -rf "/var/www/${hostname}"
+      if [[ $? -ne 0 ]]; then
+        echo "[error] failed to remove existent vhost directory"
+        exit $?
+      fi
+
+      echo "[info] vhost directory cleaned up successfully!"
+    else
+      echo "[warning] currently the ${hostname} vhost exists."
+      echo "[warning] script execution exitted"
+      echo "[warning] if you want to override, please execute with --force flag"
+      exit 1
+    fi
+  fi
+
+  local directory_skeleton=("logs" "public_html")
+  local config_filename="/etc/apache2/sites-available/${username}@${hostname}.conf"
+  local html_filename="/var/www/${hostname}/public_html/index.html"
+
+  # $LANG="en_US.UTF-8". we need only 'en' and 'UTF-8' part of it.
+  # We can't do that on "C" locale. But fallback is set and warning thrown
+  if [[ "${LANG}" != "c" ]] || [[ "${LANG}" != "C" ]]; then
+    local html_language=$(echo $(echo ${LANG} | cut -d'.' -f1) | cut -d'_' -f1)
+    local html_encoding=$(echo ${LANG} | cut -d'.' -f2)
+  else
+    echo "[ warning ] we could not detect automatically language and encoding!"
+    echo "[ warning ] fallback: locale=en; charset=UTF-8"
+    local html_language="en"
+    local html_encoding="UTF-8"
+  fi
+
+  # creating master directory
+  mkdir "/var/www/${hostname}"
+  if [[ $? -ne 0 ]]; then
+    echo "[ error ] vhost directory creation failed: ${directory}"
+    exit $?
+  fi
+
+  echo "[ info ] vhost directory created: ${directory}"
+
+  # now we create directory skeleton in vhost directory
+  for directory in ${directory_skeleton}; do
+    mkdir "/var/www/${hostname}/${directory}"
+    if [[ $? -ne 0 ]]; then
+      echo "[ error ] directory creation failed: ${directory}"
+      exit $?
+    fi
+
+    echo "[ info ] directory created: ${directory}"
+  done
+
+  # we copy the template to apache's vhost directory
+  # .ctf stands for "config template file"
+  cp "${ROOT_DIR}/tpl/vhost.ctf" "${config_filename}"
+
+  # and here we replace variables from config template
+  replace "user" "${username}" "${config_filename}"
+  replace "hostname" "${hostname}" "${config_filename}"
+
+  # now we copy HTML template to public directory...
+  cp "${ROOT_DIR}/tpl/index.ctf" "${html_filename}"
+
+  # ...and replace variables
+  replace "language" "${html_language}" "${html_filename}"
+  replace "charset" "${html_encoding}" "${html_filename}"
+  replace "hostname" "${hostname}" "${html_filename}"
+
+  # now we can enable apache2 vhost
+  a2ensite "${username}@${hostname}"
+  if [[ $? -ne 0 ]]; then
+    echo "[ fatal ] apache2 vhost activation failed"
+    exit $?
+  fi
+  echo "[ ok ] apache2 vhost activated!"
+
+  # and now we reload apache2 service
+  systemctl restart apache2
+  if [[ $? -ne 0 ]]; then
+    echo "[ fatal ] unable to reload apache2 service"
+    exit $?
+  fi
+  echo "[ ok ] apache2 service reloaded"
+
+  # now we write to hosts file
+  echo -e "127.0.0.1\t${hostname}" >> /etc/hosts
+
+  echo
+  echo "[ ok ] apache2 vhost was generated automatically"
+  echo "[ ok ] please check if it works:"
+  echo "[ ok ] http://${hostname}/"
+
+  return 0
+}
+
+function main
+{
+  check_root
+
+  if [[ -z "${SUDO_USER}" ]]; then
+    local username="${SUDO_USER}"
+  else
+    local username="${USER}"
+  fi
+
+  local hostname=$1
+
+  ## TODO implement getopts with short and long parameters
+  local force=$2
+
+  # hack: sometimes bash fails for following test, so we put both variables
+  if [[ -z $hostname ]] || [[ -z $1 ]]; then
+    read -p "Please write hostname: " hostname
+  fi
+
+  create_vhost $username $hostname $force
+}
+
+main $@
+exit $?

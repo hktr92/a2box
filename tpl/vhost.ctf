@@ -1,0 +1,9 @@
+<VirtualHost *:80>
+    ServerAdmin #user#@#hostname#
+    DocumentRoot /var/www/#hostname#/public_html
+
+    DirectoryIndex index.php
+
+    ErrorLog /var/www/#hostname#/logs/error.log
+    CustomLog /var/www/#hostname#/logs/access.log combined
+</VirtualHost>

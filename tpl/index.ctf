@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="#language#">
+  <head>
+    <meta charset="#charset#">
+    <title>Welcome to #hostname#!</title>
+  </head>
+
+  <body>
+    <h1>Hello, World!</h1>
+    <p>
+      If you see this page on <strong>#hostname#</strong>, it means that the
+      script generated virtual host without any issues.
+    </p>
+  </body>
+</html>
