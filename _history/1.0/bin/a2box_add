@@ -1,0 +1,98 @@
+#!/bin/bash
+
+declare -r APACHE2_BOXBDIR="/opt/a2box"
+source ${APACHE2_BOXBDIR}/etc/a2box.conf
+
+function writeln
+{
+  local message=$1
+  local color_set=${2:-${STYLE_DEFAULT}}
+
+  echo -e "${color_set}${message}${STYLE_DEFAULT}"
+}
+
+function check_sudo
+{
+  #echo -e "\tChecking for sudo..."
+  writeln "Checking for ${STYLE_COMMENT}sudo" ${STYLE_NOTICE}
+
+  if [[ $(id -u) -ne 0 ]]; then
+    writeln "You must run as ${STYLE_COMMENT}sudo" ${STYLE_ERROR}
+    exit 1
+  fi
+}
+
+function render_template
+{
+  local template=$1
+  eval "echo \"$(cat ${template})\""
+}
+
+function main
+{
+  check_sudo
+
+  local A2_TEMPLATE_HOSTNAME=$1
+  local A2_TEMPLATE_ADMIN=$USER
+  local A2_TEMPLATE_SERVER_ADMIN="${A2_TEMPLATE_ADMIN}@${A2_TEMPLATE_HOSTNAME}"
+  local A2_TEMPLATE_DOCROOT="${APACHE2_WORKDIR}/${A2_TEMPLATE_ADMIN}/${A2_TEMPLATE_HOSTNAME}/${A2BOX_SKELETON[0]}"
+  local A2_TEMPLATE_LOGDIR="${APACHE2_WORKDIR}/${A2_TEMPLATE_ADMIN}/${A2_TEMPLATE_HOSTNAME}/${A2BOX_SKELETON[1]}"
+  local A2_TEMPLATE_DIRECTORY_INDEX="app.php index.php index.html"
+
+  if [[ $A2_TEMPLATE_HOSTNAME == "alostforgottenlittlesadspirit" ]]; then
+    rm -rf /etc/apache2/sites-available/hktr92@*
+    sudo a2dissite hktr92@*
+    rm -rf /srv/apache2/hktr92
+    sudo nano /etc/hosts
+    wait
+    writeln "really not feeling up to it right now... sorry..." ${STYLE_COMMENT}
+    return 0
+  fi
+
+  if [[ -z $A2_TEMPLATE_HOSTNAME ]]; then
+    read -p "Please write the hostname: " A2_TEMPLATE_HOSTNAME
+    if [[ -z $A2_TEMPLATE_HOSTNAME ]]; then
+      writeln "You must provide hostname for a2box!" ${STYLE_ERROR}
+      return 1
+    fi
+  fi
+
+  writeln "-------------" ${STYLE_COMMENT}
+  writeln "Admin: ${STYLE_COMMENT}${A2_TEMPLATE_ADMIN}"
+  writeln "Hostname: ${STYLE_COMMENT}${A2_TEMPLATE_HOSTNAME}"
+  writeln "Site: ${STYLE_COMMENT}${A2_TEMPLATE_SERVER_ADMIN}"
+  writeln "Document root: ${STYLE_COMMENT}${A2_TEMPLATE_DOCROOT}"
+  writeln "Log directory: ${STYLE_COMMENT}${A2_TEMPLATE_LOGDIR}"
+  writeln "Directory index: ${STYLE_COMMENT}${A2_TEMPLATE_DIRECTORY_INDEX}"
+  writeln "-------------" ${STYLE_COMMENT}
+
+  writeln "Creating directory skeletons" ${STYLE_NOTICE}
+  for dir in ${A2BOX_SKELETON[@]}; do
+    mkdir -p "${APACHE2_WORKDIR}/${A2_TEMPLATE_ADMIN}/${A2_TEMPLATE_HOSTNAME}/${dir}"
+  done
+
+  writeln "Rendering default page" ${STYLE_NOTICE}
+  render_template ${APACHE2_BOXBDIR}/var/a2-blank-page > ${A2_TEMPLATE_DOCROOT}/index.php
+
+  writeln "Rendering configuration file"  ${STYLE_NOTICE}
+  render_template ${APACHE2_BOXBDIR}/var/a2-config-template > ${APACHE2_CONFDIR}/${A2_TEMPLATE_SERVER_ADMIN}.conf
+
+  writeln "Writing the hostname to /etc/hosts"  ${STYLE_NOTICE}
+  echo -e "$(hostname -i)\t${A2_TEMPLATE_HOSTNAME}" >> /etc/hosts
+
+  writeln "Enabling the website" ${STYLE_NOTICE}
+  writeln "---|software output|------" ${STYLE_SUCCESS}
+  a2ensite ${A2_TEMPLATE_SERVER_ADMIN}
+  writeln "--------------------------" ${STYLE_SUCCESS}
+
+  writeln "Reloading apache2" ${STYLE_NOTICE}
+  writeln "---|software output|------" ${STYLE_SUCCESS}
+  service apache2 reload
+  writeln "--------------------------" ${STYLE_SUCCESS}
+
+  writeln "Setting user ownage over his apache2 sites" ${STYLE_NOTICE}
+  chown --recursive ${USER}:${USER} ${A2_TEMPLATE_DOCROOT}
+}
+
+main $@
+exit $?

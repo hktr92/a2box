@@ -1,0 +1,21 @@
+<VirtualHost *:80>
+  ServerName ${A2_TEMPLATE_HOSTNAME}
+  ServerAdmin ${A2_TEMPLATE_SERVER_ADMIN}
+
+  DocumentRoot ${A2_TEMPLATE_DOCROOT}
+  DirectoryIndex app.php index.php
+
+  ErrorLog ${A2_TEMPLATE_LOGDIR}/httpd_error.log
+  CustomLog ${A2_TEMPLATE_LOGDIR}/httpd_access.log combined
+
+  <Directory ${A2_TEMPLATE_DOCROOT}>
+    Options FollowSymLinks
+    AllowOverride None
+    Require all granted
+
+    Order allow,deny
+    Allow from all
+  </Directory>
+</VirtualHost>
+
+# vim: syntax=apache ts=4 sw=4 sts=4 sr noet

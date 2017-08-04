@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Default Page</title>
+  </head>
+
+  <body>
+    <h1>Hello, World!</h1>
+    <p>
+      Seeing this page means your Apache2 Box was successfully installed!
+    </p>
+    <hr>
+    <p>
+      Generation command:
+    </p>
+    <address>
+      a2box ${A2_TEMPLATE_ADMIN} ${A2_TEMPLATE_HOSTNAME}
+    </address>
+    <hr>
+    <?php phpinfo(); ?>
+</html>

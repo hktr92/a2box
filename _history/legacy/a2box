@@ -1,0 +1,135 @@
+#!/bin/bash
+
+declare -r APACHE2_BOXBDIR="/opt/a2box"
+declare -r APACHE2_WORKDIR="/srv/apache2"
+declare -r APACHE2_CONFDIR="/etc/apache2/sites-available"
+declare -r A2BOX_SKELETON=("web" "logs")
+
+function check_sudo
+{
+  echo -e "\tChecking for sudo..."
+
+  if [[ $(id -u) -ne 0 ]]; then
+    echo "You must run as sudo!"
+    exit 1
+  fi
+
+  return $?
+}
+
+function render_template
+{
+  local template=$1
+  eval "echo \"$(cat ${template})\""
+}
+
+function create_dir_skeletons
+{
+  local admin=$1
+  
+  echo -e "\tCreating dir skeletons..."
+  for dir in ${A2BOX_SKELETON[@]}; do
+    echo -e "\t\tDirname=${dir}"
+    mkdir -p "${APACHE2_WORKDIR}/${dir}"
+  done
+
+  return $?
+}
+
+function render_default_page
+{
+  local docroot=$1
+  echo -e "\tRendering default page..."
+  render_template ${APACHE2_BOXBDIR}/var/a2-blank-page > ${docroot}/index.html
+
+  if [[ -e ${docroot}/index.html ]]; then
+    echo -e "\t\tRendered!"
+    return 0
+  else
+    echo -e "\t\tNot rendered; exit_code=$?"
+    return $?
+  fi
+}
+
+function render_config_file
+{
+  local hostname=$1
+  echo -e "\tRendering configuration file..."
+  render_template ${APACHE2_BOXBDIR}/var/a2-config-template > ${APACHE2_CONFDIR}/${hostname}.conf
+
+  if [[ -e ${APACHE2_CONFDIR}/${hostname}.conf ]]; then
+    echo -e "\t\tRendered!"
+    return 0
+  else
+    echo -e "\t\tNot rendered; exit_code=$?"
+    return $?
+  fi
+}
+
+function apache2_enable_website
+{
+  local hostname=$1
+  echo -e "\tEnabling the website..."
+  a2ensite ${hostname}
+  return $?
+}
+
+function apache2_restart_httpd
+{
+  echo -e "\tReloading apache2..."
+  service apache2 reload
+  return $?
+}
+
+function write_hosts
+{
+  local hostname=$1
+  echo -e "\tWriting the hostname to /etc/hosts..."
+  echo -e "$(hostname -i)\t${hostname}" >> /etc/hosts
+  return $?
+}
+
+function main {
+  check_sudo
+
+  local A2_TEMPLATE_ADMIN=$1
+  local A2_TEMPLATE_HOSTNAME=$2
+  local A2_TEMPLATE_SERVER_ADMIN="${A2_TEMPLATE_ADMIN}@${A2_TEMPLATE_HOSTNAME}"
+  local A2_TEMPLATE_DOCROOT="${APACHE2_WORKDIR}/${A2_TEMPLATE_ADMIN}/${A2_TEMPLATE_HOSTNAME}/${A2BOX_SKELETON[0]}"
+  local A2_TEMPLATE_LOGDIR="${APACHE2_WORKDIR}/${A2_TEMPLATE_ADMIN}/${A2_TEMPLATE_HOSTNAME}/${A2BOX_SKELETON[1]}"
+  local A2_TEMPLATE_DIRECTORY_INDEX="app.php index.php"
+
+  if [[ -z $A2_TEMPLATE_ADMIN ]]; then
+    echo "You must set the admin name param!"
+    return 1
+  fi
+
+  if [[ -z $A2_TEMPLATE_HOSTNAME ]]; then
+    echo "You must set the host name param!"
+    return 1
+  fi
+
+  echo "Admin: $A2_TEMPLATE_ADMIN"
+  echo "Hostname: $A2_TEMPLATE_HOSTNAME"
+  echo "Site: $A2_TEMPLATE_SERVER_ADMIN"
+  echo "Document root: $A2_TEMPLATE_DOCROOT"
+  echo "Log directory: $A2_TEMPLATE_LOGDIR"
+  echo "Directory index: $A2_TEMPLATE_DIRECTORY_INDEX"
+  echo "-------------"
+
+  create_dir_skeletons
+  render_default_page ${A2_TEMPLATE_DOCROOT}
+
+  # root usage // file manipulation
+  render_config_file ${A2_TEMPLATE_SERVER_ADMIN}
+  write_hosts ${A2_TEMPLATE_HOSTNAME}
+
+  # root usage // apache2 service manipulation
+  apache2_enable_website ${A2_TEMPLATE_SERVER_ADMIN}
+  apache2_restart_httpd
+
+  return $?
+}
+
+main $@
+exit $?

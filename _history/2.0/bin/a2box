@@ -1,0 +1,25 @@
+#!/bin/bash
+
+declare -r ROOT_DIRECTORY=$(dirname $(dirname $0))
+
+for library in $(ls ${ROOT_DIRECTORY}/lib); do
+  source ${ROOT_DIRECTORY}/etc/${library}.cnf
+  source ${ROOT_DIRECTORY}/lib/${library}.sh
+done
+
+function ::main()
+{
+  local module=$1
+  local command=$2
+
+  if [[ -z "${module}" ]]; then
+    a2box::info
+    return $?
+  fi
+
+  a2box::${module}::main $command
+  return $?
+}
+
+::main $@
+exit $?

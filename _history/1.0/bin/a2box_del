@@ -1,0 +1,70 @@
+#!/bin/bash
+
+declare -r APACHE2_BOXBDIR="/opt/a2box"
+source ${APACHE2_BOXBDIR}/etc/a2box.conf
+
+function writeln
+{
+  local message=$1
+  local color_set=${2:-${STYLE_DEFAULT}}
+
+  echo -e "${color_set}${message}${STYLE_DEFAULT}"
+}
+
+function check_sudo
+{
+  #echo -e "\tChecking for sudo..."
+  writeln "Checking for ${STYLE_COMMENT}sudo" ${STYLE_NOTICE}
+
+  if [[ $(id -u) -ne 0 ]]; then
+    writeln "You must run as ${STYLE_COMMENT}sudo" ${STYLE_ERROR}
+    exit 1
+  fi
+}
+
+function main
+{
+  check_sudo
+
+  local A2_TEMPLATE_ADMIN=$1
+  local A2_TEMPLATE_HOSTNAME=$2
+  local A2_TEMPLATE_SERVER_ADMIN="${A2_TEMPLATE_ADMIN}@${A2_TEMPLATE_HOSTNAME}"
+
+  if [[ -z $A2_TEMPLATE_ADMIN ]]; then
+    writeln "You must set the admin name param!" ${STYLE_ERROR}
+    return 1
+  fi
+
+  if [[ -z $A2_TEMPLATE_HOSTNAME ]]; then
+    writeln "You must set the host name param!" ${STYLE_ERROR}
+    return 1
+  fi
+
+  writeln "-------------" ${STYLE_COMMENT}
+  writeln "Admin: ${STYLE_COMMENT}${A2_TEMPLATE_ADMIN}"
+  writeln "Hostname: ${STYLE_COMMENT}${A2_TEMPLATE_HOSTNAME}"
+  writeln "Site: ${STYLE_COMMENT}${A2_TEMPLATE_SERVER_ADMIN}"
+  writeln "-------------" ${STYLE_COMMENT}
+
+  writeln "Disabling the website" ${STYLE_NOTICE}
+  writeln "---|software output|------" ${STYLE_SUCCESS}
+  a2dissite ${A2_TEMPLATE_SERVER_ADMIN}
+  writeln "--------------------------" ${STYLE_SUCCESS}
+
+  writeln "Reloading apache2" ${STYLE_NOTICE}
+  writeln "---|software output|------" ${STYLE_SUCCESS}
+  service apache2 reload
+  writeln "--------------------------" ${STYLE_SUCCESS}
+
+  writeln "Deleting the apache2 configuration file" ${STYLE_NOTICE}
+  rm -f ${APACHE2_CONFDIR}/${A2_TEMPLATE_SERVER_ADMIN}.conf
+
+  writeln "Deleting the website" ${STYLE_NOTICE}
+  rm -rf ${APACHE2_WORKDIR}/${A2_TEMPLATE_ADMIN}/${A2_TEMPLATE_HOSTNAME}
+
+  writeln "Removing hostname from /etc/hosts" ${STYLE_NOTICE}
+  sed -i "/${A2_TEMPLATE_HOSTNAME}/d" /etc/hosts
+}
+
+main $@
+exit $?
