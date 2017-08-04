@@ -24,7 +24,7 @@ function abs::writeln
     mkdir -p $(dirname $logfile)
   fi
 
-  printf "${STYLE_COMMENT}[%s]${STYLE_DEFAULT} ${style}%s${STYLE_DEFAULT}" $(date +%H:%M:%S) "${output}" | tee --append "${logfile}"
+  printf "${STYLE_COMMENT}[%s]${STYLE_DEFAULT} ${style}%b${STYLE_DEFAULT}\n" $(date +%H:%M:%S) "${output}" | tee --append "${logfile}"
 }
 
 ## Dumps to stdout an error message (styling only)
@@ -89,7 +89,7 @@ function abs::usage
   local program=$1
   local command=$2
 
-  abs::notice "Usage: ${program} ${command} ${STYLE_COMMENT}[command]"
+  abs::notice "Usage: ${program} ${STYLE_COMMENT}${command}${STYLE_DEFAULT} ${STYLE_COMMENT}[parameters]${STYLE_DEFAULT}"
 }
 
 ## Displays a line with execution status at the beginning
